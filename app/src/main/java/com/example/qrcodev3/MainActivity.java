@@ -4,28 +4,27 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraControl;
-import androidx.camera.core.CameraProvider;
 import androidx.camera.core.CameraSelector;
-import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageCapture;
-import androidx.camera.core.ImageCaptureException;
-import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.CameraController;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
 import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
-import android.media.Image;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
+import android.view.ScaleGestureDetector;
 import android.view.Surface;
-import android.widget.Toast;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
-import com.google.android.gms.tasks.Task;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
@@ -33,15 +32,21 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
-import java.util.List;
+import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
     private PreviewView previewView;
+    private Button button;
+    private LinearLayout listView;
+
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
     private ImageCapture imageCapture;
     private BarcodeScanner barcodeScanner;
+
+    private final ArrayList<TextView> results = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,49 +72,64 @@ public class MainActivity extends AppCompatActivity {
         BarcodeScannerOptions barcodeScannerOptions =
                 new BarcodeScannerOptions.Builder()
                         .setBarcodeFormats(
-                                Barcode.FORMAT_QR_CODE,
-                                Barcode.FORMAT_AZTEC)
+                                Barcode.FORMAT_ALL_FORMATS)
                         .build();
 
         barcodeScanner = BarcodeScanning.getClient(barcodeScannerOptions);
+
+        button = findViewById(R.id.button);
+        listView = findViewById(R.id.listView);
+        button.setOnClickListener(view -> {
+            previewView.setVisibility(View.VISIBLE);
+            listView.setVisibility(View.GONE);
+            listView.removeAllViews();
+            button.setVisibility(View.GONE);
+            launchThread();
+        });
     }
 
     void launchThread() {
-        new Thread(() -> {
-            imageCapture.takePicture(
-                ContextCompat.getMainExecutor(this),
-                new ImageCapture.OnImageCapturedCallback() {
-                    @Override
-                    @ExperimentalGetImage
-                    public void onCaptureSuccess(@NonNull ImageProxy imageProxy) {
-                        Log.w("SUCCESS", "Capture");
+        Bitmap bitmapPreview = previewView.getBitmap();
 
-                        Image image = imageProxy.getImage();
-                        if (image == null) { return; }
+        new Handler(getMainLooper()).post(() -> {
+            Log.w("SUCCESS", "CAPTURE");
+            if(bitmapPreview == null) {
+                launchThread();
+                return;
+            }
+            InputImage inputImage = InputImage.fromBitmap(bitmapPreview, 0);
+            barcodeScanner.process(inputImage)
+                    .addOnSuccessListener(barcodes -> {
+                        if (barcodes.size() != 0) {
+                            previewView.setVisibility(View.GONE);
+                            button.setVisibility(View.VISIBLE);
+                            listView.setVisibility(View.VISIBLE);
 
-                        InputImage inputImage = InputImage.fromMediaImage(image, imageProxy.getImageInfo().getRotationDegrees());
-                        barcodeScanner.process(inputImage)
-                                .addOnSuccessListener(barcodes -> {
-                                    barcodes.forEach(barcode -> {
-                                        Log.w("SUCCESS", barcode.getDisplayValue());
-                                    });
-                                }).addOnFailureListener(error -> Log.e("Error", error.getMessage()));
-
-                        imageProxy.close();
-
+                            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            listView.setBackgroundColor(Color.BLACK);
+                            params.setMargins(10,10,10,10);
+                            for (Barcode barcode : barcodes) {
+                                TextView textView = new TextView(getApplicationContext());
+                                textView.setTextSize(30);
+                                textView.setTextColor(Color.WHITE);
+                                textView.setText(barcode.getDisplayValue());
+                                textView.setLayoutParams(params);
+                                results.add(textView);
+                            }
+                            for (int i = 0; i < results.size(); i++) {
+                                listView.addView(results.get(results.size() - (i + 1)));
+                            }
+                        } else {
+                            launchThread();
+                        }
+                    }).addOnFailureListener(error -> {
+                        Log.e("Error", error.getMessage());
                         launchThread();
-                    }
-
-                    @Override
-                    public void onError(@NonNull ImageCaptureException exception) {
-                        launchThread();
-                        Log.e("ERROR", "Capture");
-                    }
-                }
-            );
-        }).start();
+                    });
+        });
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     void bindPreview(@NonNull ProcessCameraProvider cameraProvider) {
         Preview preview = new Preview.Builder()
                 .build();
