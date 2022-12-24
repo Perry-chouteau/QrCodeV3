@@ -18,7 +18,6 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
-import android.view.ScaleGestureDetector;
 import android.view.Surface;
 import android.view.View;
 import android.widget.Button;
@@ -33,7 +32,6 @@ import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
 import java.util.ArrayList;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
@@ -43,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout listView;
 
     private ListenableFuture<ProcessCameraProvider> cameraProviderFuture;
-    private ImageCapture imageCapture;
     private BarcodeScanner barcodeScanner;
 
     private final ArrayList<TextView> results = new ArrayList<>();
@@ -140,11 +137,10 @@ public class MainActivity extends AppCompatActivity {
 
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-        imageCapture =
-            new ImageCapture.Builder()
-                    .setTargetRotation(Surface.ROTATION_0)
-                    .build();
-        Camera camera = cameraProvider.bindToLifecycle((LifecycleOwner)this, cameraSelector, imageCapture,  preview);
+        ImageCapture imageCapture = new ImageCapture.Builder()
+                .setTargetRotation(Surface.ROTATION_0)
+                .build();
+        Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, imageCapture,  preview);
         CameraControl cameraControl = camera.getCameraControl();
         cameraControl.setLinearZoom((float)0.3);
 
