@@ -43,6 +43,7 @@ dependencies {
     //mine
     implementation 'net.sourceforge.streamsupport:android-retrostreams:1.7.2'
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:18.0.2'
+    implementation 'com.google.android.gms:play-services-mlkit-barcode-scanning:18.1.0'
 
     def camerax_version = "1.1.0-beta01"
 
